@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClipMind
 
-## Getting Started
+AI-powered meeting intelligence. Upload an audio file → get a structured summary, decisions, and action items.
 
-First, run the development server:
+## Stack
+
+- **Framework:** Next.js 16 (App Router) + TypeScript + Tailwind
+- **Auth:** Clerk
+- **DB:** Neon Postgres + Drizzle ORM
+- **File storage:** UploadThing
+- **Transcription:** Groq (`whisper-large-v3`)
+- **LLM:** Anthropic Claude Sonnet 4.6 (with prompt caching)
+
+## Setup
+
+### 1. Environment variables
+
+Copy `.env.local.example` to `.env.local` and fill in:
+
+```bash
+cp .env.local.example .env.local
+```
+
+You need keys for: Neon, Clerk, UploadThing, Groq, Anthropic. See the example file for variable names.
+
+Also add an `INTERNAL_SECRET` (any random string) so the upload handler can authenticate calls to `/api/process`.
+
+### 2. Database
+
+After filling `.env.local`:
+
+```bash
+npm run db:push
+```
+
+This creates the `meetings` and `action_items` tables in your Neon database.
+
+### 3. Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit http://localhost:3000 — Clerk will prompt sign-in, then you'll land on the dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. User drops audio in `UploadZone` → file goes to UploadThing
+2. UploadThing's `onUploadComplete` (in `app/api/uploadthing/core.ts`) creates a `meetings` row and pings `/api/process`
+3. `/api/process` runs the pipeline: Groq Whisper → Claude extraction → save to DB
+4. The meeting page (`/meetings/[id]`) auto-refreshes every 4s while status is `transcribing` or `extracting`
 
-## Learn More
+## Deploy to Vercel
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push this repo to GitHub
+2. Import on Vercel
+3. Add all env vars from `.env.local`
+4. Set `NEXT_PUBLIC_APP_URL` to your Vercel URL
+5. Deploy
